@@ -55,7 +55,7 @@ def do_one_iteration(
     g_input_z = g_input_z.view(g_input_z.size(0), g_input_z.size(1), 1, 1)
 
     g_fake_imgs = model["G"](g_input_z)
-    g_out_fake = model["D"](g_fake_imgs)
+    g_out_fake, _ = model["D"](g_fake_imgs)
 
     g_loss = criterion(g_out_fake.view(-1), label_real)
 

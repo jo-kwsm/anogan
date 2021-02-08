@@ -110,7 +110,6 @@ def main():
         train_d_loss, train_g_loss,  = train(
             train_loader,
             model,
-            config.model,
             criterion,
             optimizer,
             epoch,

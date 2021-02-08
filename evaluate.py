@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import torch
 
+from libs.anomaly import Anomaly_score
 from libs.config import get_config
 from libs.dataset import get_dataloader
 from libs.device import get_device
@@ -60,14 +61,51 @@ def main():
         transform=ImageTransform(mean=get_mean(), std=get_std()),
     )
 
-    make_image(
-        train_loader,
-        model,
-        config.model,
-        result_path,
-        config.z_dim,
-        device,
-    )
+    batch_iterator = iter(train_loader)
+    imgs = next(batch_iterator)  
+
+    fig = plt.figure(figsize=(15, 6))
+    for i in range(0, 5):
+        plt.subplot(2, 5, i+1)
+        plt.imshow(imgs[i][0].cpu().detach().numpy(), 'gray')
+    plt.savefig(os.path.join(result_path, "sample.png"))
+
+    x = imgs[0:5]
+    x = x.to(device)
+
+    z = torch.randn(5, 20).to(device)
+    z = z.view(z.size(0), z.size(1), 1, 1)
+
+    z.requires_grad = True
+    z_optimizer = torch.optim.Adam([z], lr=1e-3)
+
+    for epoch in range(5000+1):
+        fake_img = model["G"](z)
+        loss, _, _ = Anomaly_score(x, fake_img, model["D"], Lambda=0.1)
+
+        z_optimizer.zero_grad()
+        loss.backward()
+        z_optimizer.step()
+
+        if epoch % 1000 == 0:
+            print('epoch {} || loss_total:{:.0f} '.format(epoch, loss.item()))
+
+    model["G"].eval()
+    fake_img = model["G"](z)
+
+    loss, loss_each, residual_loss_each = Anomaly_score(x, fake_img, model["D"], Lambda=0.1)
+
+    loss_each = loss_each.cpu().detach().numpy()
+    print("total loss：", np.round(loss_each, 0))
+
+    fig = plt.figure(figsize=(15, 6))
+    for i in range(0, 5):
+        plt.subplot(2, 5, i+1)
+        plt.imshow(imgs[i][0].cpu().detach().numpy(), 'gray')
+
+        plt.subplot(2, 5, 5+i+1)
+        plt.imshow(fake_img[i][0].cpu().detach().numpy(), 'gray')
+    plt.savefig(os.path.join(result_path, "anorm.png"))
 
     print("Done")
 
