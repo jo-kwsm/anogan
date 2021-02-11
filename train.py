@@ -77,6 +77,12 @@ def main():
         "G": g_optimizer,
         "D": d_optimizer,
     }
+    if "E" in model.keys():
+        optimizer["E"] = torch.optim.Adam(
+            model["E"].parameters(),
+            config.g_lr,
+            [config.beta1, config.beta2],
+        )
 
     begin_epoch = 0
     best_loss = float("inf")
@@ -110,6 +116,7 @@ def main():
         train_d_loss, train_g_loss,  = train(
             train_loader,
             model,
+            config.model,
             criterion,
             optimizer,
             epoch,

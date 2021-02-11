@@ -15,6 +15,7 @@ __all__ = ["train", "evaluate"]
 def do_one_iteration(
     sample: Dict[str, Any],
     model: Dict[str, nn.Module],
+    model_name: str,
     criterion: Any,
     z_dim: int,
     device: str,
@@ -31,39 +32,81 @@ def do_one_iteration(
     imgs = sample["img"].to(device)
     batch_size = imgs.shape[0]
 
-    label_real = torch.full((batch_size,), 1).to(device)
-    label_fake = torch.full((batch_size,), 0).to(device)
+    label_real = torch.full((batch_size,), 1.0).to(device)
+    label_fake = torch.full((batch_size,), 0.0).to(device)
 
-    d_input_z = torch.randn(batch_size, z_dim).to(device)
-    d_input_z = d_input_z.view(d_input_z.size(0), d_input_z.size(1), 1, 1)
+    if model_name == "DCGAN":
+        d_input_z = torch.randn(batch_size, z_dim).to(device)
+        d_input_z = d_input_z.view(d_input_z.size(0), d_input_z.size(1), 1, 1)
 
-    d_fake_imgs = model["G"](d_input_z)
-    d_out_fake, _ = model["D"](d_fake_imgs)
-    d_out_real, _ = model["D"](imgs)
+        d_fake_imgs = model["G"](d_input_z)
+        d_out_fake, _ = model["D"](d_fake_imgs)
+        d_out_real, _ = model["D"](imgs)
 
-    loss_real = criterion(d_out_real.view(-1), label_real)
-    loss_fake = criterion(d_out_fake.view(-1), label_fake)
-    d_loss = loss_real + loss_fake
+        loss_real = criterion(d_out_real.view(-1), label_real)
+        loss_fake = criterion(d_out_fake.view(-1), label_fake)
+        d_loss = loss_real + loss_fake
 
-    if iter_type == "train" and optimizer is not None:
-        optimizer["G"].zero_grad()
-        optimizer["D"].zero_grad()
-        d_loss.backward()
-        optimizer["D"].step()
+        if iter_type == "train" and optimizer is not None:
+            optimizer["G"].zero_grad()
+            optimizer["D"].zero_grad()
+            d_loss.backward()
+            optimizer["D"].step()
 
-    g_input_z = torch.randn(batch_size, z_dim).to(device)
-    g_input_z = g_input_z.view(g_input_z.size(0), g_input_z.size(1), 1, 1)
+        g_input_z = torch.randn(batch_size, z_dim).to(device)
+        g_input_z = g_input_z.view(g_input_z.size(0), g_input_z.size(1), 1, 1)
 
-    g_fake_imgs = model["G"](g_input_z)
-    g_out_fake, _ = model["D"](g_fake_imgs)
+        g_fake_imgs = model["G"](g_input_z)
+        g_out_fake, _ = model["D"](g_fake_imgs)
 
-    g_loss = criterion(g_out_fake.view(-1), label_real)
+        g_loss = criterion(g_out_fake.view(-1), label_real)
 
-    if iter_type == "train" and optimizer is not None:
-        optimizer["G"].zero_grad()
-        optimizer["D"].zero_grad()
-        g_loss.backward()
-        optimizer["G"].step()
+        if iter_type == "train" and optimizer is not None:
+            optimizer["G"].zero_grad()
+            optimizer["D"].zero_grad()
+            g_loss.backward()
+            optimizer["G"].step()
+
+    elif model_name == "BigGAN":
+        # for Discriminator
+        z_out_real = model["E"](imgs)
+        d_out_real, _ = model["D"](imgs, z_out_real)
+
+        input_z = torch.randn(batch_size, z_dim).to(device)
+        fake_images = model["G"](input_z)
+        d_out_fake, _ = model["D"](fake_images, input_z)
+
+        d_loss_real = criterion(d_out_real.view(-1), label_real)
+        d_loss_fake = criterion(d_out_fake.view(-1), label_fake)
+        d_loss = d_loss_real + d_loss_fake
+
+        if iter_type == "train" and optimizer is not None:
+            optimizer["D"].zero_grad()
+            d_loss.backward()
+            optimizer["D"].step()
+
+        # for Generator
+        input_z = torch.randn(batch_size, z_dim).to(device)
+        fake_images = model["G"](input_z)
+        d_out_fake, _ = model["D"](fake_images, input_z)
+
+        g_loss = criterion(d_out_fake.view(-1), label_real)
+
+        if iter_type == "train" and optimizer is not None:
+            optimizer["G"].zero_grad()
+            g_loss.backward()
+            optimizer["G"].step()
+
+        # for Encoder
+        z_out_real = model["E"](imgs)
+        d_out_real, _ = model["D"](imgs, z_out_real)
+
+        e_loss = criterion(d_out_real.view(-1), label_fake)
+
+        if iter_type == "train" and optimizer is not None:
+            optimizer["E"].zero_grad()
+            e_loss.backward()
+            optimizer["E"].step()
 
     return batch_size, d_loss.item(), g_loss.item()
 
@@ -71,6 +114,7 @@ def do_one_iteration(
 def train(
     loader: DataLoader,
     model: nn.Module,
+    model_name: str,
     criterion: Any,
     optimizer: optim.Optimizer,
     epoch: int,
@@ -106,6 +150,7 @@ def train(
         batch_size, d_loss, g_loss = do_one_iteration(
             sample,
             model,
+            model_name,
             criterion,
             z_dim,
             device,
