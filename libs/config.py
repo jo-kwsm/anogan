@@ -23,6 +23,7 @@ class Config:
     z_dim: int = 20
 
     train_csv: str = "./csv/data.csv"
+    test_csv: str = "./csv/test_data.csv"
 
     def __post_init__(self) -> None:
         self._type_check()

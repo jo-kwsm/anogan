@@ -46,14 +46,36 @@ def main() -> None:
         data,
         columns=["image_path"],
     )
+    test_df = pd.DataFrame(
+        {
+            "image_path": make_test_datapath_list(args.dataset_dir),
+        },
+    )
 
     # 保存ディレクトリがなければ，作成
     os.makedirs(args.save_dir, exist_ok=True)
 
     # 保存
     df.to_csv(os.path.join(args.save_dir, "data.csv"), index=None)
+    test_df.to_csv(os.path.join(args.save_dir, "test_data.csv"), index=None)
 
     print("Finished making csv files.")
+
+
+def make_test_datapath_list(dataset_dir: str):
+    test_img_list = list()
+
+    for img_idx in range(5):
+        img_path = os.path.join(dataset_dir, "img_7_" + str(img_idx)+".jpg")
+        test_img_list.append(img_path)
+
+        img_path = os.path.join(dataset_dir, "img_8_" + str(img_idx)+".jpg")
+        test_img_list.append(img_path)
+
+        img_path = os.path.join(dataset_dir, "img_2_" + str(img_idx)+".jpg")
+        test_img_list.append(img_path)
+
+    return test_img_list
 
 
 if __name__ == "__main__":
